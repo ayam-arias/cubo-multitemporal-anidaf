@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador del cubo multitemporal</title>
+<meta name="description" content="Simulación interactiva de un cubo de datos multitemporal con fotografía aérea histórica: rutas Python y ArcGIS Pro. Seminario GeoIA, Instituto Geográfico Militar, 23 de octubre de 2026.">
+<style>
+:root{
+  --bg:#07142E; --panel:#0D1D3F; --panel-2:#12264F; --line:#22396A; --line-2:#2E4A80;
+  --text:#EEF2F8; --muted:#A9B6CC; --dim:#7387A6;
+  --gold:#F2C14E; --gold-ink:#1A1405; --cyan:#4CC3E6; --red:#F0616B; --green:#5FD08A;
+  --code-bg:#061026; --kw:#F2C14E; --str:#8FD6A4; --num:#7CC7F0; --com:#6F82A3;
+  --radius:12px; --gap:16px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45}
+a{color:var(--cyan)}
+.wrap{max-width:1360px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+.kicker{color:var(--gold);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
+h1{font-size:clamp(24px,3.2vw,36px);line-height:1.12;margin:6px 0 4px;font-weight:600;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0;max-width:62ch}
+.route{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+.route button{all:unset;cursor:pointer;padding:9px 18px;border-radius:999px;font-weight:600;color:var(--muted);font-size:14px;white-space:nowrap}
+.route button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink)}
+.route button:focus-visible,.chip:focus-visible,.step:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.banner{display:flex;gap:12px;align-items:flex-start;background:rgba(242,193,78,.08);border:1px solid rgba(242,193,78,.35);border-radius:var(--radius);padding:10px 14px;margin:0 0 var(--gap);color:var(--text);font-size:14px}
+.banner b{color:var(--gold)}
+.grid{display:grid;gap:var(--gap);grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(320px,440px)}
+.grid2{display:grid;gap:var(--gap);grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-top:var(--gap)}
+@media (max-width:1180px){.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.panel-route{grid-column:1 / -1}}
+@media (max-width:760px){.grid,.grid2{grid-template-columns:minmax(0,1fr)}.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;min-width:0}
+.card h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card h2 span.tag{letter-spacing:0;text-transform:none;color:var(--dim);font-weight:400;font-size:12px}
+canvas{display:block;width:100%;touch-action:manipulation}
+.cube-wrap{position:relative}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.row label{font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{all:unset;cursor:pointer;font-size:13px;padding:5px 10px;border-radius:8px;border:1px solid var(--line-2);color:var(--text);background:var(--panel-2)}
+.chip[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.chip.to[aria-pressed="true"]{background:var(--cyan);border-color:var(--cyan);color:#04202B}
+.ctrl{display:grid;grid-template-columns:auto 1fr auto;gap:8px 10px;align-items:center;margin-top:10px;font-size:13px}
+.ctrl span.v{font-family:var(--mono);color:var(--gold);min-width:64px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--gold)}
+.switch{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+.switch input{accent-color:var(--gold);width:16px;height:16px}
+.mapbar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--text);box-shadow:inset 0 -2px 0 var(--gold)}
+.hint{font-size:12px;color:var(--dim)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.stat{background:var(--panel-2);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:20px;font-family:var(--mono);font-weight:600}
+.stat span{font-size:12px;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.step{all:unset;cursor:pointer;border:1px solid var(--line-2);border-radius:10px;padding:7px 8px;font-size:12px;color:var(--muted);text-align:left;line-height:1.25}
+.step b{display:block;color:var(--text);font-size:13px}
+.step[aria-pressed="true"]{border-color:var(--gold);background:rgba(242,193,78,.1)}
+.step[aria-pressed="true"] b{color:var(--gold)}
+.lead{font-size:14px;margin:0 0 10px;color:var(--text)}
+@media (max-width:760px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+pre.code{margin:0;background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.code .k{color:var(--kw)} .code .s{color:var(--str)} .code .n{color:var(--num)} .code .c{color:var(--com);font-style:italic}
+.code .o{color:#D5DEEC} .code .err{color:var(--red)} .code .ok{color:var(--green)}
+.gp{display:flex;flex-direction:column;gap:10px}
+.tool{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tool .th{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--panel-2);padding:7px 10px;font-weight:600;font-size:13px}
+.tool .th small{color:var(--dim);font-weight:400}
+.tool .tb{padding:8px 10px;display:grid;grid-template-columns:minmax(110px,44%) 1fr;gap:5px 10px;font-size:12.5px}
+.tool .tb .p{color:var(--muted)}
+.tool .tb .val{font-family:var(--mono);background:#0B1A38;border:1px solid var(--line);border-radius:6px;padding:2px 7px;color:var(--text);overflow-wrap:anywhere}
+.tool .tb .val.hl{border-color:var(--gold);color:var(--gold)}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.warn{color:var(--red)}
+.okc{color:var(--green)}
+.hist{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.hcell{background:var(--panel-2);border-radius:10px;padding:8px;text-align:center;border:1px solid transparent}
+.hcell.sel{border-color:var(--gold)}
+.hcell .yr{font-size:12px;color:var(--muted)}
+.hcell .cls{display:inline-block;margin-top:6px;font-size:12px;padding:2px 7px;border-radius:999px;color:#0B1020;font-weight:600;line-height:1.3}
+.hcell .iv{font-family:var(--mono);font-size:13px;margin-top:6px}
+.answer{margin-top:12px;font-size:15px}
+.answer b{color:var(--gold)}
+.bars{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.bar{display:grid;grid-template-columns:118px 1fr 52px;gap:8px;align-items:center;font-size:12.5px}
+.bar .track{position:relative;height:14px;background:var(--panel-2);border-radius:4px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#5A78B5}
+.bar .fill.bad{background:var(--red)}
+.bar .num{font-family:var(--mono);text-align:right;color:var(--muted)}
+.gridline{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--gold)}
+footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="kicker">Seminario GeoIA · Instituto Geográfico Militar · 23 oct 2026</div>
+      <h1>Del archivo que se consulta al cubo que se mide</h1>
+      <p class="sub">Simulador interactivo de un cubo de datos multitemporal con fotografía aérea histórica. Mismo método, dos rutas: código abierto en Python o herramientas de ArcGIS Pro.</p>
+    </div>
+    <div class="route" role="group" aria-label="Ruta de trabajo">
+      <button type="button" id="rPy" aria-pressed="true">Ruta Python</button>
+      <button type="button" id="rArc" aria-pressed="false">Ruta ArcGIS Pro</button>
+    </div>
+  </header>
+
+  <div class="banner" role="note">
+    <span aria-hidden="true">⚠</span>
+    <div><b>Simulación solo para graficación.</b> El paisaje, las épocas, los valores y la "verdad" de referencia son <b>sintéticos</b> y se generan en tu navegador. No son fotogramas del archivo ANIDAF ni resultados de un modelo. Sirven para entender cómo se construye y se lee un cubo.</div>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="hCube">
+      <h2 id="hCube">El cubo <span class="tag">x · y · tiempo</span></h2>
+      <div class="cube-wrap"><canvas id="cube" height="380" aria-label="Vista isométrica del cubo: cinco épocas apiladas"></canvas></div>
+      <div class="legend" id="classLegend"></div>
+      <div class="ctrl">
+        <label for="shift" title="Fase C">Error de registro</label>
+        <input id="shift" type="range" min="0" max="6" step="1" value="0">
+        <span class="v" id="shiftV">0 m</span>
+      </div>
+      <label class="switch" style="margin-top:8px"><input type="checkbox" id="homog"> Homogeneizar tonos contra la época ancla (fase D)</label>
+      <p class="hint" style="margin:8px 0 0">Haz clic en el mapa para atravesar el cubo en un punto.</p>
+    </section>
+
+    <section class="card" aria-labelledby="hMap">
+      <div class="mapbar">
+        <h2 id="hMap" style="margin:0">Mapa <span class="tag" id="mapTag"></span></h2>
+        <div class="seg" role="group" aria-label="Vista del mapa">
+          <button type="button" id="vEpoch" aria-pressed="true">Época</button>
+          <button type="button" id="vChange" aria-pressed="false">Cambio</button>
+        </div>
+      </div>
+      <canvas id="map" aria-label="Mapa de la época o del cambio detectado"></canvas>
+      <div id="epochCtl">
+        <div class="row"><label>Época</label><div class="chips" id="epochChips"></div></div>
+      </div>
+      <div id="changeCtl" hidden>
+        <div class="row"><label>Desde</label><div class="chips" id="fromChips"></div></div>
+        <div class="row"><label>Hasta</label><div class="chips" id="toChips"></div></div>
+        <div class="ctrl">
+          <label for="mmu">Unidad mínima</label>
+          <input id="mmu" type="range" min="0" max="1" step="0.05" value="0.5">
+          <span class="v" id="mmuV">0,5 ha</span>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--gold)"></i>Cambio real detectado</span>
+          <span><i style="background:var(--red)"></i>Falso cambio</span>
+          <span><i style="background:var(--cyan)"></i>Cambio no detectado</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="sArea">–</b><span>área detectada</span></div>
+          <div class="stat"><b id="sUser">–</b><span>exactitud de usuario</span></div>
+          <div class="stat"><b id="sProd">–</b><span>exactitud de productor</span></div>
+        </div>
+      </div>
+      <p class="hint" id="coord" style="margin:8px 0 0">&nbsp;</p>
+    </section>
+
+    <section class="card panel-route" aria-labelledby="hRoute">
+      <h2 id="hRoute"><span id="routeTitle">Ruta Python</span> <span class="tag" id="routeTag">repositorio · cubo/</span></h2>
+      <div class="steps" role="group" aria-label="Pasos">
+        <button type="button" class="step" data-step="0" aria-pressed="true"><b>1 · Grilla</b>común</button>
+        <button type="button" class="step" data-step="1" aria-pressed="false"><b>2 · Cubo</b>multidimensional</button>
+        <button type="button" class="step" data-step="2" aria-pressed="false"><b>3 · Punto</b>¿desde cuándo?</button>
+        <button type="button" class="step" data-step="3" aria-pressed="false"><b>4 · Cambio</b>dónde cambió</button>
+      </div>
+      <p class="lead" id="stepLead"></p>
+      <div id="routeBody"></div>
+      <p class="note" id="stepNote"></p>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card" aria-labelledby="hHist">
+      <h2 id="hHist">Historia de un punto <span class="tag" id="ptTag"></span></h2>
+      <div class="hist" id="hist"></div>
+      <p class="answer" id="answer"></p>
+    </section>
+    <section class="card" aria-labelledby="hRule">
+      <h2 id="hRule">Regla de la grilla común <span class="tag">GSD = 18 µm × escala</span></h2>
+      <div class="ctrl" style="margin-top:0">
+        <label for="res">Grilla del cubo</label>
+        <input id="res" type="range" min="0.3" max="2" step="0.1" value="1.3">
+        <span class="v" id="resV">1,3 m</span>
+      </div>
+      <div class="bars" id="bars"></div>
+      <p class="note" id="ruleNote"></p>
+    </section>
+  </div>
+
+  <footer>
+    <div>Material complementario de la ponencia <i>Detección multitemporal de cambios territoriales</i> · CB1 Ian Franco Arias Carrasco · Sección IDE · Servicio Aerofotogramétrico</div>
+    <div><a href="https://github.com/ayam-arias/cubo-multitemporal-anidaf">Código y metodología en GitHub</a> · <a href="https://linktr.ee/geoian">linktr.ee/geoian</a></div>
+  </footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ------------------------------------------------------------------ parámetros
+const W = 180, H = 120, CELL = 5;            // celdas de la simulación (5 m) → 900 × 600 m
+const X0 = 270000, Y0 = 6370000;             // coordenadas UTM ficticias
+const EP = [
+  {id:"1963", label:"c. 1963", escala:20000, rmse:1.8, gain:.80, off:16, grain:16, vig:.30},
+  {id:"1980", label:"1980",    escala:30000, rmse:1.2, gain:1.00, off:-6, grain:11, vig:.22, humo:true},
+  {id:"1994", label:"1994",    escala:20000, rmse:0.6, gain:1.00, off:0,  grain:6,  vig:.12, ancla:true},
+  {id:"1996", label:"1996",    escala:70000, rmse:1.5, gain:1.24, off:-30,grain:9,  vig:.16},
+  {id:"2005", label:"2005",    escala:22000, rmse:0.7, gain:.93, off:10, grain:5,  vig:.10},
+];
+const gsd = e => 25400 / 1411 * 1e-6 * e.escala;   // m
+const CL = [
+  {n:"Mar",         c:"#3E7CB8", g:58},
+  {n:"Arena y duna",c:"#D9B26F", g:200},
+  {n:"Vegetación",  c:"#6FA35A", g:102},
+  {n:"Camino",      c:"#A7A7A7", g:176},
+  {n:"Estanques",   c:"#C9D2DC", g:226},
+  {n:"Industrial",  c:"#E3874A", g:82},
+  {n:"Edificación", c:"#C48FA0", g:160},
+  {n:"Humedal",     c:"#3FAE9E", g:74},
+  {n:"Muelle",      c:"#9C8B78", g:192},
+];
+const C = {MAR:0,ARENA:1,VEG:2,CAMINO:3,EST:4,IND:5,EDIF:6,HUM:7,MUE:8};
+
+// ------------------------------------------------------------------ ruido determinista
+function hash(i, j, s){ let h = (i*374761393 + j*668265263 + s*2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, y, s){ const i=Math.floor(x), j=Math.floor(y), fx=x-i, fy=y-j, u=fx*fx*(3-2*fx), v=fy*fy*(3-2*fy);
+  const a=hash(i,j,s), b=hash(i+1,j,s), c=hash(i,j+1,s), d=hash(i+1,j+1,s); return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; }
+function fbm(x, y, s){ return .55*vnoise(x,y,s)+.3*vnoise(x*2.1,y*2.1,s+7)+.15*vnoise(x*4.3,y*4.3,s+13); }
+function gauss(i, j, s){ const u1 = Math.max(hash(i,j,s), 1e-7), u2 = hash(j,i,s+99); return Math.sqrt(-2*Math.log(u1))*Math.cos(6.2832*u2); }
+
+// ------------------------------------------------------------------ paisaje sintético
+function costa(u){ return 16 + 16*Math.sin(Math.PI*u/W) + 2.5*(vnoise(u*.08, 1, 5) - .5); }
+function inRect(u, v, x0, x1, y0, y1){ return u>=x0 && u<x1 && v>=y0 && v<y1; }
+function clase(u, v, e){
+  const yc = costa(u);
+  if (e >= 1 && u >= 94 && u < 96 && v < yc && v >= (e >= 2 ? 2 : yc - 14)) return C.MUE;
+  if (v < yc) return C.MAR;
+  if (v < yc + 5 + 2*vnoise(u*.2, 3, 9)) return C.ARENA;
+  const roadY = 72 - 0.09*u;
+  if (Math.abs(v - roadY) < 1.3) return C.CAMINO;
+  if (e >= 2 && Math.abs(u - 60) < 1 && v < roadY) return C.CAMINO;
+  if ((u-104)**2 + (v-102)**2 < 50) return C.HUM;
+  // parque de estanques
+  const rows = e === 0 ? 2 : e === 1 ? 3 : 4, cols = e === 0 ? 3 : e === 1 ? 4 : 6;
+  if (inRect(u, v, 8, 12 + cols*8, 28, 32 + rows*8)) {
+    const cu = Math.round((u-14)/8), cv = Math.round((v-34)/8);
+    if (cu>=0 && cu<cols && cv>=0 && cv<rows && (u-14-cu*8)**2 + (v-34-cv*8)**2 < 8.5) return C.EST;
+    return C.IND;
+  }
+  // complejo industrial
+  if (e >= 1 && inRect(u, v, 88, 108, 38, 56)) return C.IND;
+  if (e >= 2 && inRect(u, v, 80, 122, 34, 60)) return C.IND;
+  if (e >= 4 && inRect(u, v, 122, 133, 40, 58)) return C.IND;
+  // villa
+  if (e >= 3 && inRect(u, v, 150, 168, 34, 48)) return C.EDIF;
+  if (e >= 4 && inRect(u, v, 146, 178, 30, 56)) return C.EDIF;
+  // campo dunar y duna mayor
+  if (inRect(u, v, 78, 134, 33, 66)) return C.ARENA;
+  const dx = (u-142)/34, dy = (v-90)/24;
+  if (dx*dx + dy*dy < 1 + .25*(vnoise(u*.1, v*.1, 4) - .5)) return C.ARENA;
+  return C.VEG;
+}
+function base(u, v, k){
+  let g = CL[k].g;
+  if (k === C.VEG) g += 46*(fbm(u*.13, v*.13, 2) - .5);
+  else if (k === C.ARENA) g += 10*Math.sin((u + v*.6)*.9) + 14*(fbm(u*.2, v*.2, 3) - .5);
+  else if (k === C.MAR) g += 10*(fbm(u*.1, v*.3, 6) - .5) + 4*Math.sin(v*1.7);
+  else if (k === C.IND) g += (((u>>2) + (v>>2)) % 3 === 0 ? 44 : -8) + 12*(hash(u>>1, v>>1, 8) - .5);
+  else if (k === C.EDIF) g = ((u % 5) < 3 && (v % 5) < 3) ? 188 : 118;
+  return g;
+}
+function humo(u, v){ let s = 0; for (let k = 0; k < 7; k++){ const cx = 100 - 6*k, cy = 44 - 4.6*k, sg = 3 + 1.8*k; s += 62*(1 - k/8)*Math.exp(-((u-cx)**2 + (v-cy)**2)/(2*sg*sg)); } return s; }
+
+const N = W*H;
+const clases = EP.map((_, e) => { const a = new Uint8Array(N); for (let v=0; v<H; v++) for (let u=0; u<W; u++) a[v*W+u] = clase(u, v, e); return a; });
+const crudo = EP.map((ep, e) => { const a = new Float32Array(N);
+  for (let v=0; v<H; v++) for (let u=0; u<W; u++){
+    const i = v*W+u; let g = base(u, v, clases[e][i]) * ep.gain + ep.off;
+    if (ep.humo) g += humo(u, v);
+    const r2 = (((u - W/2)/(W/2))**2 + ((v - H/2)/(H/2))**2) / 2;
+    g *= 1 - ep.vig * r2; g += ep.grain * gauss(u, v, 31 + e);
+    a[i] = Math.max(0, Math.min(255, g));
+  } return a; });
+
+// homogeneización: igualación de histograma contra la época ancla (1994)
+function cdf(a){ const h = new Float64Array(256); for (const x of a) h[Math.round(x)]++; for (let i=1; i<256; i++) h[i] += h[i-1]; for (let i=0; i<256; i++) h[i] /= a.length; return h; }
+const ANCLA = EP.findIndex(e => e.ancla);
+const homog = (() => { const cr = cdf(crudo[ANCLA]); return crudo.map(a => { const cs = cdf(a), lut = new Float32Array(256); let j = 0;
+  for (let i=0; i<256; i++){ while (j < 255 && cr[j] < cs[i]) j++; lut[i] = j; } return a.map(x => lut[Math.round(x)]); }); })();
+
+// ------------------------------------------------------------------ estado
+const S = { ruta:"py", paso:0, vista:"epoca", epoca:2, desde:0, hasta:4, mmu:.5, shift:0, homog:false, res:1.3, pu:104, pv:47 };
+const capas = () => S.homog ? homog : crudo;
+
+// ------------------------------------------------------------------ cambio
+function otsu(hist, total){ let sum = 0; for (let i=0; i<256; i++) sum += i*hist[i];
+  let sB = 0, wB = 0, best = 0, t = 0;
+  for (let i=0; i<256; i++){ wB += hist[i]; if (!wB) continue; const wF = total - wB; if (!wF) break; sB += i*hist[i];
+    const d = sB/wB - (sum - sB)/wF, b = wB*wF*d*d; if (b > best){ best = b; t = i; } } return t; }
+function filtrarUMM(m, minCells){ if (minCells <= 1) return m; const out = new Uint8Array(N), seen = new Uint8Array(N), st = [], comp = [];
+  for (let i=0; i<N; i++){ if (!m[i] || seen[i]) continue; comp.length = 0; st.push(i); seen[i] = 1;
+    while (st.length){ const p = st.pop(); comp.push(p); const pu = p % W, pv = (p / W) | 0;
+      for (let dv=-1; dv<=1; dv++) for (let du=-1; du<=1; du++){ const qu = pu+du, qv = pv+dv; if (qu<0||qv<0||qu>=W||qv>=H) continue;
+        const q = qv*W+qu; if (m[q] && !seen[q]){ seen[q] = 1; st.push(q); } } }
+    if (comp.length >= minCells) for (const p of comp) out[p] = 1; }
+  return out; }
+let CAMBIO = null;
+function calcCambio(){
+  const A = capas()[S.desde], B = capas()[S.hasta], sh = S.shift;
+  const diff = new Float32Array(N).fill(NaN), hist = new Float64Array(256); let tot = 0;
+  for (let v=0; v<H; v++) for (let u=0; u<W; u++){ const us = u - sh; if (us < 0) continue;
+    const d = Math.abs(B[v*W+us] - A[v*W+u]); diff[v*W+u] = d; hist[Math.min(255, Math.round(d))]++; tot++; }
+  const t = otsu(hist, tot);
+  const raw = new Uint8Array(N); for (let i=0; i<N; i++) raw[i] = diff[i] > t ? 1 : 0;
+  const m = filtrarUMM(raw, Math.round(S.mmu * 10000 / (CELL*CELL)));
+  const ca = clases[S.desde], cb = clases[S.hasta]; let tp=0, fp=0, fn=0, det=0;
+  const tipo = new Uint8Array(N);
+  for (let i=0; i<N; i++){ if (Number.isNaN(diff[i])) continue; const real = ca[i] !== cb[i];
+    if (m[i]){ det++; if (real){ tp++; tipo[i] = 1; } else { fp++; tipo[i] = 2; } } else if (real){ fn++; tipo[i] = 3; } }
+  const ha = c => c * CELL*CELL / 10000;
+  CAMBIO = { t, tipo, area: ha(det), areaReal: ha(tp+fn), user: det ? tp/det : NaN, prod: (tp+fn) ? tp/(tp+fn) : NaN };
+}
+
+// ------------------------------------------------------------------ utilidades
+const $ = id => document.getElementById(id);
+const fmt = (x, d=1) => Number.isFinite(x) ? x.toLocaleString("es-CL", {minimumFractionDigits:d, maximumFractionDigits:d}) : "–";
+const pct = x => Number.isFinite(x) ? Math.round(x*100) + " %" : "–";
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function hl(line){
+  if (line.startsWith("→")) { const cls = /Error/.test(line) ? "err" : /OK/.test(line) ? "ok" : "o"; return `<span class="${cls}">${esc(line)}</span>`; }
+  let out = "", rest = line; const ci = rest.indexOf("#"); let com = "";
+  if (ci >= 0 && (rest.slice(0, ci).split('"').length % 2 === 1)) { com = rest.slice(ci); rest = rest.slice(0, ci); }
+  out = esc(rest).replace(/("[^"]*")|\b(from|import|as|for|in|True|False|None|print)\b|\b(\d[\d_]*\.?\d*)\b/g,
+    (m, s, k, n) => s ? `<span class="s">${s}</span>` : k ? `<span class="k">${k}</span>` : `<span class="n">${n}</span>`);
+  return out + (com ? `<span class="c">${esc(com)}</span>` : "");
+}
+const code = lines => `<pre class="code">${lines.map(hl).join("\n")}</pre>`;
+const tool = (name, sub, rows) => `<div class="tool"><div class="th">${name}<small>${sub||""}</small></div><div class="tb">${
+  rows.map(([p, v, h]) => `<div class="p">${p}</div><div class="val${h?" hl":""}">${esc(String(v))}</div>`).join("")}</div></div>`;
+const ux = u => X0 + (u + .5)*CELL, uy = v => Y0 + (H - v - .5)*CELL;
+
+// ------------------------------------------------------------------ canvas de capas
+const layerCv = EP.map(() => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c; });
+function pintarCapas(){ capas().forEach((a, e) => { const ctx = layerCv[e].getContext("2d"), im = ctx.createImageData(W, H);
+  for (let i=0; i<N; i++){ const g = a[i]; im.data[i*4] = g; im.data[i*4+1] = g; im.data[i*4+2] = g; im.data[i*4+3] = 255; }
+  ctx.putImageData(im, 0, 0); }); }
+
+function fitCanvas(cv, cssH){ const dpr = Math.max(1, window.devicePixelRatio || 1), w = cv.clientWidth, h = cssH ?? Math.round(w*H/W);
+  cv.style.height = h + "px"; cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx, w, h}; }
+
+// mapa
+const mapCv = $("map"), ovCv = document.createElement("canvas"); ovCv.width = W; ovCv.height = H;
+function dibujarMapa(){
+  const {ctx, w, h} = fitCanvas(mapCv); const k = w / W; ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  if (S.vista === "epoca"){ ctx.drawImage(layerCv[S.epoca], 0, 0, w, h); }
+  else {
+    ctx.globalAlpha = .55; ctx.drawImage(layerCv[S.hasta], 0, 0, w, h); ctx.globalAlpha = 1;
+    const o = ovCv.getContext("2d"), im = o.createImageData(W, H), col = [null, [242,193,78], [240,97,107], [76,195,230]];
+    for (let i=0; i<N; i++){ const t = CAMBIO.tipo[i]; if (!t) continue; const c = col[t]; im.data.set([c[0], c[1], c[2], t === 3 ? 150 : 215], i*4); }
+    o.putImageData(im, 0, 0); ctx.drawImage(ovCv, 0, 0, w, h);
+  }
+  // punto
+  const px = (S.pu + .5)*k, py = (S.pv + .5)*k;
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 7, 0, 6.283); ctx.stroke();
+  ctx.strokeStyle = "#F2C14E"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px-12, py); ctx.lineTo(px-4, py); ctx.moveTo(px+4, py); ctx.lineTo(px+12, py);
+  ctx.moveTo(px, py-12); ctx.lineTo(px, py-4); ctx.moveTo(px, py+4); ctx.lineTo(px, py+12); ctx.stroke();
+  // escala
+  const m200 = 200/CELL*k; ctx.fillStyle = "rgba(7,20,46,.75)"; ctx.fillRect(8, h-26, m200 + 56, 18);
+  ctx.fillStyle = "#fff"; ctx.fillRect(14, h-19, m200, 4); ctx.font = "11px system-ui"; ctx.fillText("200 m", 20 + m200, h-13);
+  $("mapTag").textContent = S.vista === "epoca" ? `${EP[S.epoca].label} · ${EP[S.epoca].ancla ? "época ancla" : "RMSE " + fmt(EP[S.epoca].rmse) + " m (simulado)"}`
+    : `${EP[S.desde].label} → ${EP[S.hasta].label} · umbral Otsu ${CAMBIO.t}`;
+}
+function clickMapa(ev){ const r = mapCv.getBoundingClientRect(), u = Math.floor((ev.clientX - r.left) / r.width * W), v = Math.floor((ev.clientY - r.top) / r.height * H);
+  if (u<0||v<0||u>=W||v>=H) return; S.pu = u; S.pv = v; if (S.paso < 2) S.paso = 2; render(); }
+mapCv.addEventListener("click", clickMapa);
+mapCv.addEventListener("mousemove", ev => { const r = mapCv.getBoundingClientRect(), u = Math.floor((ev.clientX - r.left)/r.width*W), v = Math.floor((ev.clientY - r.top)/r.height*H);
+  if (u>=0 && v>=0 && u<W && v<H) $("coord").textContent = `X ${fmt(ux(u),0)} · Y ${fmt(uy(v),0)} (UTM 19S ficticio) · ${CL[clases[S.vista==="epoca"?S.epoca:S.hasta][v*W+u]].n}`; });
+
+// cubo isométrico
+const cubeCv = $("cube");
+function dibujarCubo(){
+  const {ctx, w, h} = fitCanvas(cubeCv, 380); ctx.clearRect(0, 0, w, h);
+  const ML = 54, MR = 26, k = Math.min((w - ML - MR) / (W + H*.78), 1.6), a = k, b = k*.40, c = -k*.78, d = k*.33;
+  const lw = W*a - H*c, lh = W*b + H*d, gap = Math.min(52, (h - lh - 30) / (EP.length - 1));
+  const ox = ML + ((w - ML - MR) - lw)/2 - H*c, oy0 = h - lh - 14;
+  const sel = S.vista === "epoca" ? [S.epoca] : [S.desde, S.hasta];
+  const P = (u, v, i) => [ox + a*u + c*v, oy0 - i*gap + b*u + d*v];
+  EP.forEach((ep, i) => {
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0); const dpr = cubeCv.width / w; ctx.scale(dpr, dpr);
+    ctx.transform(a, b, c, d, ox, oy0 - i*gap); ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = sel.includes(i) ? 1 : .78; ctx.drawImage(layerCv[i], 0, 0); ctx.globalAlpha = 1;
+    ctx.lineWidth = (sel.includes(i) ? 2.2 : 1) / k; ctx.strokeStyle = sel.includes(i) ? (S.vista === "cambio" && i === S.hasta ? "#4CC3E6" : "#F2C14E") : "rgba(169,182,204,.5)";
+    ctx.strokeRect(0, 0, W, H); ctx.restore();
+    const [lx, ly] = P(0, H, i); ctx.fillStyle = sel.includes(i) ? "#F2C14E" : "#A9B6CC"; ctx.font = "600 12px system-ui"; ctx.textAlign = "right";
+    ctx.fillText(ep.label, lx - 8, ly + 4);
+  });
+  // perforación del punto
+  const pts = EP.map((_, i) => P(S.pu + .5, S.pv + .5, i));
+  ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(...pts[0]); ctx.lineTo(...pts[pts.length-1]); ctx.stroke(); ctx.setLineDash([]);
+  pts.forEach(([x, y], i) => { ctx.fillStyle = CL[clases[i][S.pv*W + S.pu]].c; ctx.strokeStyle = "#07142E"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.283); ctx.fill(); ctx.stroke(); });
+  // eje T
+  const [tx, ty] = P(W, 0, 0), [tx2, ty2] = P(W, 0, EP.length-1); ctx.strokeStyle = "#A9B6CC"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx + 10, ty); ctx.lineTo(tx2 + 10, ty2 - 10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(tx2 + 6, ty2 - 4); ctx.lineTo(tx2 + 10, ty2 - 12); ctx.lineTo(tx2 + 14, ty2 - 4); ctx.stroke();
+  ctx.fillStyle = "#A9B6CC"; ctx.textAlign = "left"; ctx.font = "600 12px system-ui"; ctx.fillText("T", tx2 + 16, ty2 - 8);
+}
+
+// historia de un punto
+function dibujarHistoria(){
+  const i = S.pv*W + S.pu, a = capas();
+  $("ptTag").textContent = `X ${fmt(ux(S.pu),0)} · Y ${fmt(uy(S.pv),0)}`;
+  $("hist").innerHTML = EP.map((ep, e) => { const k = clases[e][i]; const sel = (S.vista === "epoca" && e === S.epoca);
+    return `<div class="hcell${sel ? " sel" : ""}"><div class="yr">${ep.label}</div><span class="cls" style="background:${CL[k].c}">${CL[k].n}</span><div class="iv">${Math.round(a[e][i])}</div></div>`; }).join("");
+  const k0 = clases[0][i]; let j = -1; for (let e=1; e<EP.length; e++) if (clases[e][i] !== k0){ j = e; break; }
+  $("answer").innerHTML = j < 0 ? `¿Desde cuándo? <b>Sin cambio de cobertura</b> entre ${EP[0].label} y ${EP[EP.length-1].label} en este punto.`
+    : `¿Desde cuándo? <b>${CL[clases[j][i]].n}</b> desde <b>${EP[j].label}</b>; en ${EP[j-1].label} era ${CL[k0 === clases[j-1][i] ? k0 : clases[j-1][i]].n.toLowerCase()}. El cambio ocurrió entre ${EP[j-1].label} y ${EP[j].label}.`;
+}
+
+// regla de la grilla
+function dibujarRegla(){
+  const max = 2; const peor = Math.max(...EP.map(gsd));
+  $("bars").innerHTML = EP.map(ep => { const g = gsd(ep), bad = g > S.res + 1e-9;
+    return `<div class="bar"><span>${ep.label} · 1:${ep.escala.toLocaleString("es-CL")}</span><div class="track"><div class="fill${bad ? " bad" : ""}" style="width:${g/max*100}%"></div><div class="gridline" style="left:calc(${S.res/max*100}% - 1px)"></div></div><span class="num">${fmt(g,2)} m</span></div>`; }).join("");
+  const ok = S.res + 1e-9 >= peor;
+  $("ruleNote").innerHTML = ok ? `<span class="okc">✓</span> Grilla de ${fmt(S.res)} m: todas las épocas se <b>agregan</b> hacia arriba. La más gruesa (1996, ${fmt(peor,2)} m) fija el mínimo.`
+    : `<span class="warn">✗ Grilla de ${fmt(S.res)} m más fina que 1996 (${fmt(peor,2)} m):</span> habría que remuestrear hacia abajo e inventar detalle. Para detalle se arma un segundo cubo solo con las escalas grandes.`;
+}
+
+// panel de ruta
+const LEAD = [
+  "Todas las épocas deben compartir sistema de referencia, tamaño de píxel y alineación. La época más gruesa fija la grilla.",
+  "Las épocas se apilan en el eje T. Cada capa lleva su fecha y su exactitud declarada (RMSE).",
+  "Atravesar el cubo en un punto entrega su historia completa y responde ¿desde cuándo?",
+  "Diferencia entre épocas, umbral automático de Otsu y unidad mínima de mapeo. Prueba subir el error de registro o apagar la homogeneización.",
+];
+function panelPy(){
+  const p = S.paso, e = EP, r = S.res, peor = Math.max(...e.map(gsd)), i = S.pv*W + S.pu;
+  if (p === 0) return code([
+    "from cubo.grilla import gsd_m, resolucion_cubo, grilla_alineada",
+    "",
+    `gsds = [gsd_m(1411, e) for e in (${e.map(x => x.escala.toLocaleString("en-US").replace(/,/g,"_")).join(", ")})]`,
+    `→ [${e.map(x => gsd(x).toFixed(2)).join(", ")}]`,
+    "resolucion_cubo(gsds)",
+    `→ ${resolucionCubo().toFixed(1)}`,
+    "",
+    `grilla = grilla_alineada(*extension, resolucion_m=${r.toFixed(1)}, epsg=32719)`,
+    "cubo = construir_cubo(epocas, grilla)",
+    r + 1e-9 >= peor ? `→ OK · ${e.length} épocas agregadas a ${r.toFixed(1)} m` :
+      `→ ValueError: La época (${peor.toFixed(2)} m) es más gruesa que la grilla (${r.toFixed(2)} m): no se remuestrea hacia abajo.`,
+  ]);
+  if (p === 1) return code([
+    "from cubo.apilar import Epoca, construir_cubo",
+    "",
+    "epocas = [Epoca(etiqueta, fecha, ruta, gsd_m, rmse_m), ...]  # tus ortofotos",
+    `cubo = construir_cubo(epocas, grilla, etiqueta_ancla="1994",`,
+    `                      homogeneizar_capas=${S.homog ? "True" : "False"})`,
+    "cubo.dims, cubo.shape",
+    `→ ('tiempo', 'y', 'x'), (${e.length}, ${H}, ${W})`,
+    "cubo.etiqueta.values",
+    `→ [${e.map(x => "'" + x.id + "'").join(", ")}]`,
+    "cubo.rmse_m.values   # exactitud declarada (simulada)",
+    `→ [${e.map(x => x.rmse.toFixed(1)).join(", ")}]`,
+    `cubo.sel(tiempo="${e[S.epoca].id}")   # la capa visible en el mapa`,
+    "cubo.to_netcdf(\"salidas/cubo.nc\")",
+  ]);
+  if (p === 2) return code([
+    "from cubo.apilar import historia_de_un_punto",
+    "",
+    `historia_de_un_punto(cubo, x=${Math.round(ux(S.pu))}, y=${Math.round(uy(S.pv))}).values`,
+    `→ array([${capas().map(a => Math.round(a[i])).join(", ")}])`,
+    "",
+    "# lectura visual de cada época (simulada):",
+    ...e.map((x, k) => `# ${x.label.padEnd(8)} ${CL[clases[k][i]].n}`),
+  ]);
+  const c = CAMBIO;
+  return code([
+    "from cubo.cambio import mascara_cambio, area_ha",
+    "from cubo.validacion import olofsson",
+    "",
+    `antes = cubo.sel(tiempo="${e[S.desde].id}").values`,
+    `despues = cubo.sel(tiempo="${e[S.hasta].id}").values`,
+    `m, t = mascara_cambio(antes, despues, resolucion_m=${CELL}, umm_ha=${S.mmu.toFixed(2)})`,
+    `→ t = ${c.t}  (umbral de Otsu)`,
+    "area_ha(m, 5)",
+    `→ ${c.area.toFixed(2)} ha detectadas · ${c.areaReal.toFixed(2)} ha reales (simulación)`,
+    "",
+    "# validación contra la referencia simulada",
+    `→ exactitud de usuario ${pct(c.user)} · de productor ${pct(c.prod)}`,
+    S.shift ? `# ojo: ${S.shift * CELL} m de error de registro → falso cambio en los bordes` : "# registro perfecto (fase C bien hecha)",
+  ]);
+}
+function resolucionCubo(){ return Math.ceil(Math.max(...EP.map(gsd)) / .1 - 1e-9) * .1; }
+function panelArc(){
+  const p = S.paso, e = EP, r = S.res, peor = Math.max(...e.map(gsd)), i = S.pv*W + S.pu;
+  if (p === 0) return `<div class="gp">${tool("Entornos de geoprocesamiento", "Environments", [
+      ["Sistema de coordenadas de salida", "WGS 1984 UTM Zone 19S"],
+      ["Tamaño de celda", r.toFixed(1) + " m", true],
+      ["Ráster de alineación (Snap Raster)", "orto_1994"],
+    ])}${tool("Aggregate", "una vez por época", [
+      ["Ráster de entrada", "orto_1980.tif …"],
+      ["Factor de celda", "según GSD de cada época"],
+      ["Técnica de agregación", "MEAN"],
+    ])}</div><p class="note">${r + 1e-9 >= peor ? '<span class="okc">✓ Todas las épocas se agregan hacia arriba.</span>' : `<span class="warn">✗ Celda de ${fmt(r)} m menor que 1996 (${fmt(peor,2)} m): no agregues hacia abajo.</span>`}</p>`;
+  if (p === 1) return `<div class="gp">${tool("Create Mosaic Dataset", "", [["Nombre", "cubo_anidaf"], ["Bandas", "1"], ["SRC", "EPSG:32719"]])}${
+    tool("Add Rasters To Mosaic Dataset", "", [["Tipo de ráster", "Raster Dataset"], ["Entrada", e.length + " ortofotos"], ["Calcular estadísticas", "Sí"]])}${
+    tool("Build Multidimensional Info", "", [["Campo de variable", "Variable = intensidad"], ["Campos de dimensión", "FechaVuelo"], ["Atributo extra", "RMSE_m (exactitud declarada)"]])}${
+    tool("Funciones ráster (fase D)", "", [["Stretch con estadísticas de 1994", S.homog ? "Activado" : "Desactivado", true]])}${
+    tool("Pestaña Multidimensional", "control de tiempo", [["Corte actual", e[S.epoca].label, true]])}</div>`;
+  if (p === 2) return `<div class="gp">${tool("Temporal Profile", "gráfico sobre el ráster multidimensional", [
+      ["Punto (X, Y)", `${Math.round(ux(S.pu))}, ${Math.round(uy(S.pv))}`, true], ["Variable", "intensidad"], ["Dimensión", "FechaVuelo"],
+      ...e.map((x, k) => [x.label, `${Math.round(capas()[k][i])} · ${CL[clases[k][i]].n}`])])}</div>`;
+  const c = CAMBIO;
+  return `<div class="gp">${tool("Change Detection Wizard", "Imagery › Change Detection", [
+      ["Método", "Pixel Value Change"], ["Variable", "intensidad"], ["From slice", e[S.desde].label, true], ["To slice", e[S.hasta].label, true],
+      ["Difference type", "Absolute"], ["Corte de clase (umbral)", String(c.t), true], ["Área mínima", fmt(S.mmu, 2) + " ha", true], ["Guardar como", "Feature class"]])}${
+    tool("Resultado", "simulado", [["Área detectada", fmt(c.area, 2) + " ha", true], ["Exactitud de usuario", pct(c.user)], ["Exactitud de productor", pct(c.prod)]])}</div>`;
+}
+const NOTES = [
+  ["Código: <code>cubo/grilla.py</code>", "Guía: <code>docs/arcgis-pro.md</code> · fase E"],
+  ["Código: <code>cubo/apilar.py</code>", "Ráster multidimensional; no es un Space Time Cube (ese es para puntos y eventos)."],
+  ["El modelo hace esta lectura en cada píxel; el fotogrametrista la valida.", "El modelo hace esta lectura en cada píxel; el fotogrametrista la valida."],
+  ["Código: <code>cubo/cambio.py</code> y <code>cubo/validacion.py</code> (Olofsson et al., 2014).", "Requiere la extensión Image Analyst. Para “qué cambió”: Train Deep Learning Model (U-Net o Change detector)."],
+];
+
+// ------------------------------------------------------------------ controles
+function chips(el, cls, get, set){ el.innerHTML = EP.map((ep, i) => `<button type="button" class="chip ${cls}" data-i="${i}" aria-pressed="${get() === i}">${ep.label}</button>`).join("");
+  el.onclick = ev => { const b = ev.target.closest("button"); if (!b) return; set(+b.dataset.i); render(); }; }
+function setVista(v){ S.vista = v; $("vEpoch").setAttribute("aria-pressed", v === "epoca"); $("vChange").setAttribute("aria-pressed", v === "cambio");
+  $("epochCtl").hidden = v !== "epoca"; $("changeCtl").hidden = v !== "cambio"; }
+$("vEpoch").onclick = () => { setVista("epoca"); if (S.paso === 3) S.paso = 1; render(); };
+$("vChange").onclick = () => { setVista("cambio"); S.paso = 3; render(); };
+$("rPy").onclick = () => { S.ruta = "py"; render(); };
+$("rArc").onclick = () => { S.ruta = "arc"; render(); };
+document.querySelectorAll(".step").forEach(b => b.onclick = () => { S.paso = +b.dataset.step; setVista(S.paso === 3 ? "cambio" : "epoca"); render(); });
+$("shift").oninput = ev => { S.shift = +ev.target.value; render(); };
+$("homog").onchange = ev => { S.homog = ev.target.checked; pintarCapas(); render(); };
+$("mmu").oninput = ev => { S.mmu = +ev.target.value; render(); };
+$("res").oninput = ev => { S.res = +ev.target.value; if (S.paso !== 0) S.paso = 0; render(); };
+$("classLegend").innerHTML = CL.map(c => `<span><i style="background:${c.c}"></i>${c.n}</span>`).join("");
+
+function render(){
+  calcCambio();
+  chips($("epochChips"), "", () => S.epoca, i => S.epoca = i);
+  chips($("fromChips"), "", () => S.desde, i => { S.desde = i; if (S.hasta === i) S.hasta = i < EP.length-1 ? i+1 : i-1; });
+  chips($("toChips"), "to", () => S.hasta, i => { S.hasta = i; if (S.desde === i) S.desde = i > 0 ? i-1 : i+1; });
+  $("rPy").setAttribute("aria-pressed", S.ruta === "py"); $("rArc").setAttribute("aria-pressed", S.ruta === "arc");
+  document.querySelectorAll(".step").forEach(b => b.setAttribute("aria-pressed", +b.dataset.step === S.paso));
+  $("routeTitle").textContent = S.ruta === "py" ? "Ruta Python" : "Ruta ArcGIS Pro";
+  $("routeTag").textContent = S.ruta === "py" ? "repositorio · cubo/" : "Image Analyst · ráster multidimensional";
+  $("stepLead").textContent = LEAD[S.paso];
+  $("routeBody").innerHTML = S.ruta === "py" ? panelPy() : panelArc();
+  $("stepNote").innerHTML = NOTES[S.paso][S.ruta === "py" ? 0 : 1];
+  if (S.paso === 3 && CAMBIO.prod < .6) $("stepNote").innerHTML += ' <br><span class="warn">Exactitud de productor baja:</span> hay cambios de uso que casi no cambian el brillo (p. ej., vegetación → patio industrial). Ese es el límite del nivel 1; el nivel 2 supervisado (U-Net) aprende la clase.';
+  if (S.paso === 3 && S.shift > 0) $("stepNote").innerHTML += ` <br><span class="warn">Error de registro de ${S.shift * CELL} m:</span> aparecen falsos cambios en los bordes. La fase C decide el proyecto.`;
+  $("shiftV").textContent = `${S.shift * CELL} m`;
+  $("mmuV").textContent = `${fmt(S.mmu, 2)} ha`;
+  $("resV").textContent = `${fmt(S.res)} m`;
+  $("sArea").textContent = `${fmt(CAMBIO.area)} ha`; $("sUser").textContent = pct(CAMBIO.user); $("sProd").textContent = pct(CAMBIO.prod);
+  dibujarMapa(); dibujarCubo(); dibujarHistoria(); dibujarRegla();
+}
+pintarCapas();
+setVista("epoca");
+render();
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { dibujarMapa(); dibujarCubo(); }, 80); });
+})();
+</script>
+</body>
+</html>

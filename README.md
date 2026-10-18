@@ -8,6 +8,12 @@ Metodología y código abierto para ordenar décadas de fotografía aérea en un
 
 ---
 
+## Simulador interactivo
+
+👉 **[Abrir el simulador](https://ayam-arias.github.io/cubo-multitemporal-anidaf/)** (`docs/index.html`): un cubo de cinco épocas que se puede atravesar en un punto, con detección de cambios, error de registro y homogeneización, y con su equivalente paso a paso en **Python** y en **ArcGIS Pro**.
+
+> Simulación con datos sintéticos generados en el navegador, solo para graficar el concepto. No son fotogramas del archivo ANIDAF ni resultados de un modelo.
+
 ## ¿Qué es un cubo de datos?
 
 Muchas fotos del mismo lugar, **en la misma grilla, ordenadas en el tiempo**. X e Y dicen dónde; T dice cuándo. Atravesar el cubo en un punto entrega su historia completa y responde la pregunta clave: **¿desde cuándo?**
