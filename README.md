@@ -28,6 +28,16 @@ Tres reglas que no se negocian:
 2. **Georreferenciar no basta: se ortorrectifica con DEM.** El relieve desplaza la foto (`d = r · h / H`).
 3. **La exactitud se declara y el área se valida.** RMSE con ≥ 30 puntos de chequeo (ASPRS, 2024); área ajustada con IC 95 % (Olofsson et al., 2014).
 
+## Tres rutas al mismo cubo
+
+| Ruta | Para quién | Guía |
+|---|---|---|
+| **ArcGIS Pro** | Analistas SIG, sin programar: Ortho Mapping, ráster multidimensional, Change Detection Wizard y aprendizaje profundo | [`docs/arcgis-pro.md`](docs/arcgis-pro.md) · [`arcgis/cubo_arcpy.py`](arcgis/cubo_arcpy.py) |
+| **Python abierto** | Investigación y automatización con rasterio, xarray y scikit-image | este README · [`cubo/`](cubo/) |
+| **Google Earth Engine** | Cubo regional anual con Landsat y Sentinel-2, también desde ArcGIS Pro con el GEE Toolbox | [`docs/earth-engine.md`](docs/earth-engine.md) · [`gee/cubo_regional_gee.py`](gee/cubo_regional_gee.py) |
+
+Las tres rutas siguen las mismas seis fases y las mismas reglas. Cambia la herramienta, no el método.
+
 ## Estructura
 
 ```
@@ -41,8 +51,14 @@ scripts/
   construir_cubo.py   construye el cubo desde una configuración YAML
 config/
   epocas_plantilla.yaml
+arcgis/
+  cubo_arcpy.py       mosaico multidimensional y diferencia entre épocas con arcpy
+gee/
+  cubo_regional_gee.py  compuestos anuales Landsat y Sentinel-2 exportados como COG
 docs/
-  metodologia.md
+  metodologia.md      las seis fases en detalle
+  arcgis-pro.md       ruta ArcGIS Pro paso a paso
+  earth-engine.md     ruta Earth Engine y unión de ambos cubos
 tests/
   test_metodo.py      verifica las reglas con valores publicados (sin datos)
 ```
@@ -74,7 +90,7 @@ m, umbral = mascara_cambio(cubo[0].values, cubo[-1].values, resolucion_m=cubo.at
 print(f"Cambio detectado: {area_ha(m, cubo.attrs['resolucion_m']):.1f} ha")
 ```
 
-Herramientas equivalentes: ArcGIS Pro con Image Analyst (Ortho Mapping, ráster multidimensional) para las fases B a E; Google Earth Engine para la referencia actual y el cubo regional satelital.
+¿Prefieres no programar? Sigue la ruta de [ArcGIS Pro](docs/arcgis-pro.md).
 
 ## Límites
 

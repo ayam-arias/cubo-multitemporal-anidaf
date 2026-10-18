@@ -6,4 +6,5 @@ scipy>=1.10
 scikit-image>=0.21
 pyyaml>=6.0
 opencv-python-headless>=4.8   # opcional: registro SIFT + RANSAC
+earthengine-api>=1.0        # opcional: cubo regional (gee/)
 pytest>=7.0                   # pruebas
