@@ -2,7 +2,12 @@
 
 **Del archivo que se consulta al cubo que se mide.**
 
-Metodología y código abierto para ordenar décadas de fotografía aérea en un **cubo de datos** (tiempo, y, x) y detectar cambios territoriales con exactitud declarada. Acompaña la ponencia *Detección multitemporal de cambios territoriales: un cubo de datos con cuatro décadas de fotografía aérea del archivo ANIDAF* (Seminario GeoIA, Instituto Geográfico Militar, 23 de octubre de 2026).
+Metodología y código abierto para ordenar décadas de fotografía aérea en un **cubo de datos** (tiempo, y, x) y detectar cambios territoriales con exactitud declarada. Acompaña dos ponencias del 23 de octubre de 2026:
+
+- *Detección multitemporal de cambios territoriales: un cubo de datos con cuatro décadas de fotografía aérea del archivo ANIDAF* (Seminario GeoIA, Instituto Geográfico Militar, con Esri Chile).
+- *Del archivo histórico a la decisión: avión, satélite y dron sobre el archivo ANIDAF para la fiscalización ambiental del territorio* (Simposio Tecnologías Aerotransportadas, Servicio Aerofotogramétrico – Duoc UC).
+
+Presentaciones, referencias y contacto: **[linktr.ee/geoian](https://linktr.ee/geoian)**.
 
 > **Este repositorio no contiene datos.** Solo describe el método e incluye código para aplicarlo a tus propias ortofotos. Las imágenes del Archivo Nacional de Imágenes Aéreas (ANIDAF) se solicitan al [Servicio Aerofotogramétrico](https://www.saf.cl/productos/anidaf/).
 
@@ -19,6 +24,18 @@ Metodología y código abierto para ordenar décadas de fotografía aérea en un
 Muchas fotos del mismo lugar, **en la misma grilla, ordenadas en el tiempo**. X e Y dicen dónde; T dice cuándo. Atravesar el cubo en un punto entrega su historia completa y responde la pregunta clave: **¿desde cuándo?**
 
 La condición es que todas las capas calcen: mismo sistema de referencia, misma extensión, mismo tamaño de píxel y grilla alineada. Si no, no es un cubo: es una pila de imágenes.
+
+## Avión, satélite y dron en el mismo cubo
+
+Cada plataforma aerotransportada responde una pregunta distinta; el cubo las pone en la misma grilla.
+
+| Plataforma | Pregunta | Resolución típica | Rol en el cubo |
+|---|---|---|---|
+| **Avión** (archivo ANIDAF, 1945–2010) | ¿Desde cuándo? | ≈1,26 m (18 µm × 1:70.000) | Línea base histórica |
+| **Satélite** (Landsat, Sentinel-2, FASat-Delta) | ¿Dónde cambió? | 30 m a 0,72 m | Serie anual regional |
+| **Dron** (RPAS) | ¿Cuánto, exactamente? | ≈3 cm a 100 m | Verificación local actual |
+
+Para combinarlas se agrega el detalle hacia la resolución común del cubo (regla 1). El dron no se degrada para la medición local: se usa como verdad de terreno para validar el cambio detectado.
 
 ## El método en seis fases
 
