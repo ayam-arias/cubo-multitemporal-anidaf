@@ -1,0 +1,32 @@
+# Plantilla: reemplaza las rutas por TUS ortofotos (este repositorio no incluye datos).
+# Una época = un vuelo, ya ortorrectificado (fase C) y con RMSE medido con
+# ≥ 30 puntos de chequeo independientes.
+
+grilla:
+  epsg: 32719            # WGS 84 / UTM 19S (Chile central). Ajusta a tu zona.
+  extension: [xmin, ymin, xmax, ymax]   # en metros, en el EPSG indicado
+  resolucion_m: null     # null = se calcula: la época más gruesa, redondeada hacia arriba
+
+escaneo_dpi: 1411        # 1.411 dpi ≈ 18 µm
+
+ancla: "1994"            # época de referencia para homogeneizar (la de mejor geometría)
+
+epocas:
+  - etiqueta: "1963"
+    fecha: "1963-01-01"  # fecha aproximada: dilo en 'nota'
+    ruta: "datos/orto_1963.tif"
+    escala: 20000
+    rmse_m: null
+    nota: "fecha aproximada, verificar en ficha"
+  - etiqueta: "1980"
+    fecha: "1980-01-01"
+    ruta: "datos/orto_1980.tif"
+    escala: 30000
+    rmse_m: null
+  - etiqueta: "1994"
+    fecha: "1994-01-01"
+    ruta: "datos/orto_1994.tif"
+    escala: 20000
+    rmse_m: null
+
+salida: "salidas/cubo.nc"

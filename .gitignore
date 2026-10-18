@@ -1,0 +1,17 @@
+# Este repositorio NO contiene datos: solo metodología y código.
+data/
+datos/
+salidas/
+*.tif
+*.tiff
+*.jp2
+*.nc
+*.zarr/
+*.img
+*.ecw
+*.las
+*.laz
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
